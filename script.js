@@ -41,7 +41,54 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         alert("URL Error: No Quiz ID found.");
     }
+    
+    // Initialize Swipe Listeners
+    setupSwipe('examSwipeArea', () => {
+        // Prev Action
+        if(!isPaused && currentIdx > 0) loadQuestion(currentIdx - 1);
+    }, () => {
+        // Next Action
+        if(!isPaused && currentIdx < questions.length - 1) loadQuestion(currentIdx + 1);
+    });
+
+    setupSwipe('resSwipeArea', () => {
+        // Result Prev
+        const nIdx = filteredIndices.indexOf(currentResRealIdx);
+        if(nIdx > 0) loadResultQuestion(filteredIndices[nIdx - 1]);
+    }, () => {
+        // Result Next
+        const nIdx = filteredIndices.indexOf(currentResRealIdx);
+        if(nIdx < filteredIndices.length - 1) loadResultQuestion(filteredIndices[nIdx + 1]);
+    });
 });
+
+let currentResRealIdx = -1; // Track current result question index for swipe
+
+function setupSwipe(elementId, onSwipeRight, onSwipeLeft) {
+    const el = document.getElementById(elementId);
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
+    if(!el) return;
+
+    el.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, {passive: true});
+
+    el.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, {passive: true});
+
+    function handleSwipe() {
+        if (touchEndX < touchStartX - 50) {
+            onSwipeLeft(); // Swiped Left -> Go Next
+        }
+        if (touchEndX > touchStartX + 50) {
+            onSwipeRight(); // Swiped Right -> Go Prev
+        }
+    }
+}
 
 function loadQuizFromFirebase(quizId) {
     database.ref('quizzes/' + quizId).once('value').then((snapshot) => {
@@ -59,19 +106,20 @@ function loadQuizFromFirebase(quizId) {
 
             questions = data.questions;
 
-            // PRE-PROCESS: Ensure correctIndex is a Number for ALL questions immediately
+            // PRE-PROCESS: Ensure correctIndex is a Number
             questions.forEach(q => {
                 q.correctIndex = parseInt(q.correctIndex);
                 if (isNaN(q.correctIndex)) q.correctIndex = 0; 
             });
 
-            // 2. Randomization Logic
+            // 2. Randomization Logic (With Fix for 'Option A' Issue)
             if(data.randomizeQuestions) {
                 shuffleArray(questions);
             }
             if(data.randomizeOptions) {
                 questions.forEach(q => {
                     let cIdx = q.correctIndex;
+                    // Safety check
                     if (cIdx < 0 || cIdx >= q.options.length) cIdx = 0;
                     
                     const correctText = q.options[cIdx];
@@ -84,7 +132,11 @@ function loadQuizFromFirebase(quizId) {
                     
                     q.options = combinedOpts.map(o => o.text);
                     q.optImgs = combinedOpts.map(o => o.img);
-                    q.correctIndex = q.options.indexOf(correctText);
+                    
+                    // Re-calculate correct index based on the moved text
+                    const newIndex = q.options.indexOf(correctText);
+                    // If somehow not found (rare duplicate case), fallback to 0 but ideally correctText is unique
+                    q.correctIndex = newIndex !== -1 ? newIndex : 0;
                 });
             }
 
@@ -112,6 +164,7 @@ function loadQuizFromFirebase(quizId) {
                     <p>২. <strong>পাস মার্ক (Pass Mark):</strong> ${quizSettings.passMark}</p>
                     <p>৩. <strong>মার্কিং:</strong> প্রতিটি সঠিক উত্তরের জন্য <b>+${quizSettings.posMark}</b> এবং ভুল উত্তরের জন্য <b>-${quizSettings.negMark}</b> নম্বর কাটা যাবে</p>
                     <p>৪. ডানদিকের প্যালেট ব্যবহার করে যে কোনো প্রশ্নে যাওয়া যাবে</p>
+                    <p>৫. <strong>নতুন:</strong> স্ক্রিনে বামে/ডানে সোয়াইপ করে প্রশ্ন পরিবর্তন করা যাবে।</p>
                     
                     <div style="background:#f9f9f9; padding:10px; border-radius:5px; margin-top:10px; font-size:13px;">
                         <strong>কালার কোড (Legend):</strong>
@@ -138,7 +191,7 @@ document.getElementById('startTestBtn').addEventListener('click', () => {
     localStorage.setItem('student_name', name);
 
     document.getElementById('instructionScreen').style.display = 'none';
-    document.getElementById('quizMainArea').style.display = 'block';
+    document.getElementById('quizMainArea').style.display = 'flex'; // Changed to flex for swipe container
     if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
     loadQuestion(0);
     startTimer();
@@ -197,7 +250,7 @@ document.getElementById('markReviewBtn').addEventListener('click', () => {
     if(isPaused) return; 
     const i = getSelIdx(); 
     if(i!==null){ userAnswers[currentIdx]=i; status[currentIdx]=4; } else status[currentIdx]=3; 
-    nextQ(); 
+    if(currentIdx < questions.length - 1) loadQuestion(currentIdx + 1); else openDrawer();
 });
 
 document.getElementById('saveNextBtn').addEventListener('click', () => { 
@@ -208,7 +261,7 @@ document.getElementById('saveNextBtn').addEventListener('click', () => {
     if (currentIdx === questions.length - 1) { 
         if (confirm("আপনি কি নিশ্চিত যে আপনি পরীক্ষা শেষ করতে চান?")) submitTest(); 
     } else { 
-        nextQ(); 
+        loadQuestion(currentIdx + 1); 
     }
 });
 
@@ -218,8 +271,6 @@ document.getElementById('clearResponseBtn').addEventListener('click', () => {
     userAnswers[currentIdx]=null; 
     status[currentIdx]=1; 
 });
-
-function nextQ() { if(currentIdx < questions.length - 1) loadQuestion(currentIdx + 1); else openDrawer(); }
 
 // Drawer & Timer
 const drawer = document.getElementById('paletteSheet');
@@ -261,8 +312,8 @@ function submitTest() {
     if(isSubmitted) return;
     isSubmitted = true;
     clearInterval(timerInterval);
-    if(document.exitFullscreen) document.exitFullscreen();
-
+    // REMOVED: document.exitFullscreen() to keep fullscreen in result
+    
     let s=0, c=0, w=0, sk=0;
     
     questions.forEach((q, i) => { 
@@ -322,7 +373,11 @@ function submitTest() {
 }
 
 function applyFilter(t) {
-    document.querySelectorAll('.f-btn').forEach(b => { b.classList.remove('active'); if(b.innerText.toLowerCase()===t) b.classList.add('active'); });
+    // Update all filter buttons (in both tabs)
+    document.querySelectorAll('.f-btn').forEach(b => { 
+        b.classList.remove('active'); 
+        if(b.innerText.toLowerCase() === t) b.classList.add('active'); 
+    });
     
     filteredIndices = [];
     questions.forEach((q, i) => {
@@ -339,9 +394,16 @@ function applyFilter(t) {
     
     renderResultPalette();
     
+    // Auto load first question of filter list in solution tab
     if(filteredIndices.length > 0) { 
+        document.getElementById('resEmptyMsg').style.display = 'none';
+        document.getElementById('tab-solution-view').querySelector('.content-area').style.display = 'block';
         loadResultQuestion(filteredIndices[0]); 
-    } 
+    } else {
+        // Show empty message if no questions in this filter
+        document.getElementById('resEmptyMsg').style.display = 'flex';
+        document.getElementById('tab-solution-view').querySelector('.content-area').style.display = 'none';
+    }
 }
 
 function renderResultPalette() {
@@ -357,7 +419,6 @@ function renderResultPalette() {
         else btn.classList.add('wrong');
         
         btn.onclick = () => {
-            // Auto switch to solution tab when clicked from Score Tab palette
             loadResultQuestion(idx);
             switchTab('solution');
         };
@@ -368,6 +429,8 @@ function renderResultPalette() {
 function loadResultQuestion(realIdx) {
     const nIdx = filteredIndices.indexOf(realIdx);
     if(nIdx === -1) return;
+    
+    currentResRealIdx = realIdx; // Update for swipe
 
     document.querySelectorAll('.rp-btn').forEach(b => b.classList.remove('active'));
     if(document.querySelectorAll('.rp-btn')[nIdx]) document.querySelectorAll('.rp-btn')[nIdx].classList.add('active');
@@ -441,7 +504,7 @@ function switchTab(tabName) {
         document.getElementById('tab-solution-view').style.display = 'none';
     } else {
         document.getElementById('tab-score-view').style.display = 'none';
-        document.getElementById('tab-solution-view').style.display = 'flex'; // Use flex to maintain layout
+        document.getElementById('tab-solution-view').style.display = 'flex'; 
         document.getElementById('tab-solution-view').style.flexDirection = 'column';
     }
 }
