@@ -48,7 +48,7 @@
         </div>
     </div>
 
-    <div id="quizMainArea" style="display: none;">
+    <div id="quizMainArea" style="display: none; height:100vh; flex-direction:column;">
         <header class="app-header">
             <div class="header-left">
                 <span class="material-icons menu-icon">menu</span>
@@ -80,7 +80,7 @@
             </div>
         </div>
 
-        <div class="content-area">
+        <div class="content-area" id="examSwipeArea">
             <div class="question-text" id="questionTextBox">Loading...</div>
             <div class="options-list" id="optionsContainer"></div>
         </div>
@@ -148,11 +148,23 @@
             </div>
 
             <div id="tab-solution-view" class="res-content-area" style="display:none;">
+                
+                <div style="background:#f8f9fa; padding:10px; border-bottom:1px solid #eee;">
+                     <div class="filter-tabs" style="justify-content:center; margin:0;">
+                        <button class="f-btn active" onclick="applyFilter('all')">All</button>
+                        <button class="f-btn" onclick="applyFilter('correct')">Correct</button>
+                        <button class="f-btn" onclick="applyFilter('wrong')">Wrong</button>
+                        <button class="f-btn" onclick="applyFilter('skipped')">Skipped</button>
+                    </div>
+                </div>
+
                 <div class="q-info-bar" style="border-bottom:1px solid #eee;">
                     <div class="q-num">Question No. <span id="resCurrentQNum">1</span></div>
                     <div class="res-status-badge" id="resQStatusBadge">Correct</div>
                 </div>
-                <div class="content-area" style="padding-bottom: 60px;"> <div class="question-text" id="resQuestionText">Loading...</div>
+
+                <div class="content-area" id="resSwipeArea" style="padding-bottom: 60px;"> 
+                    <div class="question-text" id="resQuestionText">Loading...</div>
                     <div class="options-list" id="resOptionsContainer"></div>
                     
                     <div id="resExplanation" class="explanation-box" style="display:none;">
