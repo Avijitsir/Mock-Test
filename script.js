@@ -262,12 +262,12 @@ function submitTest() {
     let s=0, c=0, w=0, sk=0;
     
     questions.forEach((q, i) => { 
-        // Force conversion to number
+        // Force conversion to Number
         const correctIdx = Number(q.correctIndex);
         const userAns = userAnswers[i];
         
         if(userAns !== null) { 
-            // Use loose equality (==) to handle string/number mismatch
+            // Use loose equality (==) for robust comparison
             if(userAns == correctIdx) { 
                 s += quizSettings.posMark; 
                 c++; 
