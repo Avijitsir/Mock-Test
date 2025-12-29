@@ -114,9 +114,13 @@
 
     <div id="resultModal" class="modal">
         <div class="modal-content result-box">
-            <div class="res-header-pnl">
-                <h2 style="margin:0 0 5px 0; text-align:center;">Result Analysis</h2>
-                
+            
+            <div class="res-tab-header">
+                <button class="rt-tab active" onclick="switchTab('score')" id="btn-score">📊 Score Card</button>
+                <button class="rt-tab" onclick="switchTab('solution')" id="btn-solution">📝 Solution</button>
+            </div>
+
+            <div id="tab-score-view" class="res-header-pnl" style="overflow-y:auto; height:100%;">
                 <div id="passFailBox" style="text-align:center; padding:8px; margin-bottom:10px; font-weight:bold; font-size:16px; border-radius:5px;"></div>
 
                 <div class="score-grid">
@@ -125,38 +129,45 @@
                     <div class="s-item"><span class="lbl">Wrong</span><span class="val red" id="resWrong">0</span></div>
                     <div class="s-item"><span class="lbl">Skipped</span><span class="val gray" id="resSkip">0</span></div>
                 </div>
-                <div class="filter-tabs">
+                
+                <div class="filter-tabs" style="justify-content:center; margin-top:15px;">
                     <button class="f-btn active" onclick="applyFilter('all')">All</button>
                     <button class="f-btn" onclick="applyFilter('correct')">Correct</button>
                     <button class="f-btn" onclick="applyFilter('wrong')">Wrong</button>
                     <button class="f-btn" onclick="applyFilter('skipped')">Skipped</button>
                 </div>
-                <div class="res-palette-scroll" id="resPaletteContainer"></div>
+                
+                <h4 style="margin:15px 0 5px 0; color:#555; text-align:center;">Question Palette:</h4>
+                <div class="res-palette-scroll" id="resPaletteContainer" style="flex-wrap:wrap; justify-content:center; padding-bottom:20px;"></div>
+                
+                <div style="margin-top:20px; text-align:center; padding-bottom:20px;">
+                    <button class="tb-btn primary" style="background:#4361ee; color:white; padding:12px 30px; margin-bottom:10px;" onclick="switchTab('solution')">View Solutions &rarr;</button>
+                    <br>
+                    <button class="tb-btn secondary" style="background:#6c757d; color:white; padding:10px 20px;" onclick="location.reload()">Close & Re-attempt</button>
+                </div>
             </div>
 
-            <div class="res-content-area" id="resContentArea">
+            <div id="tab-solution-view" class="res-content-area" style="display:none;">
                 <div class="q-info-bar" style="border-bottom:1px solid #eee;">
                     <div class="q-num">Question No. <span id="resCurrentQNum">1</span></div>
                     <div class="res-status-badge" id="resQStatusBadge">Correct</div>
                 </div>
-                <div class="content-area" style="padding-bottom: 20px;">
-                    <div class="question-text" id="resQuestionText">Loading...</div>
+                <div class="content-area" style="padding-bottom: 60px;"> <div class="question-text" id="resQuestionText">Loading...</div>
                     <div class="options-list" id="resOptionsContainer"></div>
                     
                     <div id="resExplanation" class="explanation-box" style="display:none;">
                         <strong>Explanation:</strong> <span id="resExplText"></span>
                     </div>
                 </div>
-            </div>
-            
-            <div id="resEmptyMsg" style="display:none; flex:1; justify-content:center; align-items:center; color:#888;">No questions found in this category.</div>
+                
+                <div id="resEmptyMsg" style="display:none; flex:1; justify-content:center; align-items:center; color:#888;">No questions found in this category.</div>
 
-            <div class="result-footer">
-                <div class="footer-row">
-                    <button class="tb-btn secondary" id="resPrevBtn">Previous</button>
-                    <button class="tb-btn secondary" id="resNextBtn">Next</button>
+                <div class="result-footer">
+                    <div class="footer-row">
+                        <button class="tb-btn secondary" id="resPrevBtn">Previous</button>
+                        <button class="tb-btn secondary" id="resNextBtn">Next</button>
+                    </div>
                 </div>
-                <button class="tb-btn primary full-width" style="margin-top:10px; width:100%; background:#007bff; color:white;" onclick="location.reload()">Close & Re-attempt</button>
             </div>
         </div>
     </div>
