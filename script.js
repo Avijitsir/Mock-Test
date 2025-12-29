@@ -23,9 +23,7 @@ let isPaused = false;
 let filteredIndices = [];
 let quizSettings = { passMark: 30, posMark: 1, negMark: 0.33 };
 let currentQuizId = null;
-let sections = {}; // To store section start indices
 
-// --- Helper: Shuffle Array ---
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -44,38 +42,60 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("URL Error: No Quiz ID found.");
     }
     
-    // Swipe Listeners (Exam & Result)
-    setupSwipe('examSwipeArea', 
-        () => { if(!isPaused && currentIdx > 0) loadQuestion(currentIdx - 1); }, // Swipe Right (Prev)
-        () => { if(!isPaused && currentIdx < questions.length - 1) loadQuestion(currentIdx + 1); } // Swipe Left (Next)
-    );
+    // Initialize Swipe Listeners
+    setupSwipe('examSwipeArea', () => {
+        if(!isPaused && currentIdx > 0) loadQuestion(currentIdx - 1);
+    }, () => {
+        if(!isPaused && currentIdx < questions.length - 1) loadQuestion(currentIdx + 1);
+    });
 
-    setupSwipe('resSwipeArea', 
-        () => { const nIdx = filteredIndices.indexOf(currentResRealIdx); if(nIdx > 0) loadResultQuestion(filteredIndices[nIdx - 1]); }, 
-        () => { const nIdx = filteredIndices.indexOf(currentResRealIdx); if(nIdx < filteredIndices.length - 1) loadResultQuestion(filteredIndices[nIdx + 1]); }
-    );
+    setupSwipe('resSwipeArea', () => {
+        const nIdx = filteredIndices.indexOf(currentResRealIdx);
+        if(nIdx > 0) loadResultQuestion(filteredIndices[nIdx - 1]);
+    }, () => {
+        const nIdx = filteredIndices.indexOf(currentResRealIdx);
+        if(nIdx < filteredIndices.length - 1) loadResultQuestion(filteredIndices[nIdx + 1]);
+    });
 
-    // Checkbox Listener for Button Enable & Fullscreen
+    // --- FIX: Checkbox Listener for Validation & Fullscreen ---
     document.getElementById('agreeCheck').addEventListener('change', function() {
-        document.getElementById('startTestBtn').disabled = !this.checked;
+        const btn = document.getElementById('startTestBtn');
+        btn.disabled = !this.checked; // চেক না করলে বাটন ডিজেবল থাকবে
+        
+        // চেক বক্সে ক্লিক করলেই ফুলস্ক্রিন হবে (Introduction Fullscreen Fix)
         if(this.checked && document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen().catch(err => console.log("Fullscreen blocked"));
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log("Fullscreen blocked: User interaction required.");
+            });
         }
     });
 });
 
 let currentResRealIdx = -1; 
 
-// --- Swipe Logic ---
 function setupSwipe(elementId, onSwipeRight, onSwipeLeft) {
     const el = document.getElementById(elementId);
-    let touchStartX = 0; let touchEndX = 0;
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
     if(!el) return;
-    el.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});
-    el.addEventListener('touchend', e => { touchEndX = e.changedTouches[0].screenX; handleSwipe(); }, {passive: true});
+
+    el.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, {passive: true});
+
+    el.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, {passive: true});
+
     function handleSwipe() {
-        if (touchEndX < touchStartX - 50) onSwipeLeft(); // Next
-        if (touchEndX > touchStartX + 50) onSwipeRight(); // Prev
+        if (touchEndX < touchStartX - 50) {
+            onSwipeLeft(); 
+        }
+        if (touchEndX > touchStartX + 50) {
+            onSwipeRight(); 
+        }
     }
 }
 
@@ -83,7 +103,7 @@ function loadQuizFromFirebase(quizId) {
     database.ref('quizzes/' + quizId).once('value').then((snapshot) => {
         const data = snapshot.val();
         if (data && data.questions) {
-            // Load Settings
+            // 1. Load Settings
             if(data.title) document.getElementById('instTitle').innerText = data.title;
             if(data.duration) timeLeft = parseInt(data.duration) * 60;
             if(data.passMark) quizSettings.passMark = parseFloat(data.passMark);
@@ -93,71 +113,43 @@ function loadQuizFromFirebase(quizId) {
             document.getElementById('dispPosMark').innerText = "+" + quizSettings.posMark;
             document.getElementById('dispNegMark').innerText = "-" + quizSettings.negMark;
 
-            // --- Process Questions & Sections ---
-            let rawQuestions = data.questions;
-            
-            // 1. Fix Types & Defaults
-            rawQuestions.forEach(q => {
+            questions = data.questions;
+
+            // PRE-PROCESS
+            questions.forEach(q => {
                 q.correctIndex = parseInt(q.correctIndex);
                 if (isNaN(q.correctIndex)) q.correctIndex = 0; 
-                if (!q.subject) q.subject = "General"; // Default subject if missing
             });
 
-            // 2. Group by Subject
-            const grouped = {};
-            // Maintain order of appearance of subjects roughly or sort alphabetically? 
-            // We will respect order of entry for sections mostly.
-            rawQuestions.forEach(q => {
-                const sub = q.subject;
-                if(!grouped[sub]) grouped[sub] = [];
-                grouped[sub].push(q);
-            });
-
-            questions = []; // Flattened final array
-            sections = {};  // Map subject -> start index
-            
-            Object.keys(grouped).forEach(subj => {
-                let subjQs = grouped[subj];
-
-                // 3. Randomize Options (Correct Logic)
-                if(data.randomizeOptions) {
-                    subjQs.forEach(q => {
-                        let cIdx = q.correctIndex;
-                        if (cIdx < 0 || cIdx >= q.options.length) cIdx = 0;
-                        const correctText = q.options[cIdx]; // Store correct answer text
-                        
-                        let combinedOpts = q.options.map((opt, i) => { 
-                            return { text: opt, img: (q.optImgs && q.optImgs[i]) ? q.optImgs[i] : null }; 
-                        });
-                        
-                        shuffleArray(combinedOpts); // Shuffle
-                        
-                        q.options = combinedOpts.map(o => o.text);
-                        q.optImgs = combinedOpts.map(o => o.img);
-                        
-                        // Find where the correct answer went
-                        const newIndex = q.options.indexOf(correctText);
-                        q.correctIndex = newIndex !== -1 ? newIndex : 0;
+            // 2. Randomization Logic
+            if(data.randomizeQuestions) {
+                shuffleArray(questions);
+            }
+            if(data.randomizeOptions) {
+                questions.forEach(q => {
+                    let cIdx = q.correctIndex;
+                    if (cIdx < 0 || cIdx >= q.options.length) cIdx = 0;
+                    
+                    const correctText = q.options[cIdx];
+                    
+                    let combinedOpts = q.options.map((opt, i) => {
+                        return { text: opt, img: (q.optImgs && q.optImgs[i]) ? q.optImgs[i] : null };
                     });
-                }
-                
-                // 4. Randomize Questions within Subject
-                if(data.randomizeQuestions) {
-                    shuffleArray(subjQs);
-                }
-
-                // 5. Store Section Info & Merge
-                sections[subj] = questions.length; // Start index of this section
-                questions = questions.concat(subjQs);
-            });
-
-            // Render Tabs
-            renderSectionTabs();
+                    
+                    shuffleArray(combinedOpts);
+                    
+                    q.options = combinedOpts.map(o => o.text);
+                    q.optImgs = combinedOpts.map(o => o.img);
+                    
+                    const newIndex = q.options.indexOf(correctText);
+                    q.correctIndex = newIndex !== -1 ? newIndex : 0;
+                });
+            }
 
             status = new Array(questions.length).fill(0); 
             userAnswers = new Array(questions.length).fill(null); 
             
-            // Previous Score Display
+            // --- 3. Previous Score Logic ---
             let prevScoreMsg = "";
             const savedScore = localStorage.getItem('last_score_' + quizId);
             if(savedScore) {
@@ -166,7 +158,7 @@ function loadQuizFromFirebase(quizId) {
                 </div>`;
             }
 
-            // Instructions HTML
+            // --- 4. INSTRUCTION PAGE ---
             const instHTML = `
                 ${prevScoreMsg}
                 <div style="font-family: 'Roboto', sans-serif; font-size: 15px; line-height: 1.6; color:#333;">
@@ -176,39 +168,29 @@ function loadQuizFromFirebase(quizId) {
                     <h3 style="margin-bottom:10px; color:#0d47a1;">সাধারণ নির্দেশাবলী (Instructions):</h3>
                     <p>১. <strong>মোট সময় (Duration):</strong> ${data.duration} মিনিট</p>
                     <p>২. <strong>পাস মার্ক (Pass Mark):</strong> ${quizSettings.passMark}</p>
-                    <p>৩. <strong>নেগেটিভ মার্কিং:</strong> প্রতিটি ভুল উত্তরের জন্য <b>${quizSettings.negMark}</b> নম্বর কাটা যাবে।</p>
-                    <p>৪. উপরের <b>ট্যাব (Tabs)</b> ব্যবহার করে বিভিন্ন সেকশনে (যেমন: GK, Math) যাওয়া যাবে।</p>
-                    <p>৫. স্ক্রিনে বামে/ডানে সোয়াইপ করে প্রশ্ন পরিবর্তন করা যাবে।</p>
+                    <p>৩. <strong>মার্কিং:</strong> প্রতিটি সঠিক উত্তরের জন্য <b>+${quizSettings.posMark}</b> এবং ভুল উত্তরের জন্য <b>-${quizSettings.negMark}</b> নম্বর কাটা যাবে</p>
+                    <p>৪. ডানদিকের প্যালেট ব্যবহার করে যে কোনো প্রশ্নে যাওয়া যাবে</p>
+                    <p>৫. <strong>নতুন:</strong> স্ক্রিনে বামে/ডানে সোয়াইপ করে প্রশ্ন পরিবর্তন করা যাবে।</p>
+                    
+                    <div style="background:#f9f9f9; padding:10px; border-radius:5px; margin-top:10px; font-size:13px;">
+                        <strong>কালার কোড (Legend):</strong>
+                        <ul class="legend-list" style="margin-top:5px;">
+                            <li><span class="dot-icon not-visited"></span> দেখেনি (Not Visited)</li>
+                            <li><span class="dot-icon not-answered"></span> উত্তর দেয়নি (Not Answered)</li>
+                            <li><span class="dot-icon answered"></span> উত্তর দিয়েছে (Answered)</li>
+                            <li><span class="dot-icon marked"></span> মার্ক করা (Marked for Review)</li>
+                        </ul>
+                    </div>
                 </div>`;
             
             document.getElementById('instContent').innerHTML = instHTML;
-            // Ensure button state matches checkbox
+            
+            // --- FIX: Button disabled logic logic fixed ---
+            // বাটন ডিজেবল থাকবে যতক্ষণ না চেকবক্সে ক্লিক করা হয়
             document.getElementById('startTestBtn').disabled = !document.getElementById('agreeCheck').checked;
         } else {
             document.getElementById('instContent').innerHTML = "Quiz not found or invalid.";
         }
-    });
-}
-
-// --- Render Section Tabs ---
-function renderSectionTabs() {
-    const bar = document.querySelector('.section-bar');
-    bar.innerHTML = ''; 
-    
-    // Create "All Sections" tab? Or just subject tabs. Let's do Subject Tabs.
-    Object.keys(sections).forEach((subj, idx) => {
-        const chip = document.createElement('div');
-        chip.className = 'chip';
-        chip.innerText = subj;
-        chip.dataset.subject = subj;
-        
-        if(idx === 0) chip.classList.add('active');
-        
-        chip.onclick = () => {
-            loadQuestion(sections[subj]);
-        };
-        
-        bar.appendChild(chip);
     });
 }
 
@@ -218,7 +200,7 @@ document.getElementById('startTestBtn').addEventListener('click', () => {
     localStorage.setItem('student_name', name);
 
     document.getElementById('instructionScreen').style.display = 'none';
-    document.getElementById('quizMainArea').style.display = 'flex'; // Flex for layout
+    document.getElementById('quizMainArea').style.display = 'flex'; 
     if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
     loadQuestion(0);
     startTimer();
@@ -240,15 +222,6 @@ function loadQuestion(index) {
     document.getElementById('currentQNum').innerText = index + 1;
     const q = questions[index];
     
-    // Update Active Section Tab
-    document.querySelectorAll('.section-bar .chip').forEach(c => c.classList.remove('active'));
-    const currentSubj = q.subject || "General";
-    const activeChip = document.querySelector(`.section-bar .chip[data-subject="${currentSubj}"]`);
-    if(activeChip) {
-        activeChip.classList.add('active');
-        activeChip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
-
     let qHTML = "";
     if(q.passage) qHTML += `<div class="passage-box"><strong>Passage:</strong><br>${q.passage.replace(/\n/g, '<br>')}</div>`;
     if(q.qImg) qHTML += `<img src="${q.qImg}" class="q-img-display">`;
