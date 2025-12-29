@@ -59,16 +59,23 @@ function loadQuizFromFirebase(quizId) {
 
             questions = data.questions;
 
+            // PRE-PROCESS: Ensure correctIndex is a Number for ALL questions immediately
+            questions.forEach(q => {
+                q.correctIndex = parseInt(q.correctIndex);
+                if (isNaN(q.correctIndex)) q.correctIndex = 0; // Fallback safety
+            });
+
             // 2. Randomization Logic
             if(data.randomizeQuestions) {
                 shuffleArray(questions);
             }
             if(data.randomizeOptions) {
                 questions.forEach(q => {
-                    // Ensure correctIndex is treated as an integer initially
-                    let cIdx = parseInt(q.correctIndex);
-                    // Safety check if index is valid
-                    if (isNaN(cIdx) || cIdx < 0 || cIdx >= q.options.length) cIdx = 0;
+                    // correctIndex is already an integer from the loop above
+                    let cIdx = q.correctIndex;
+                    
+                    // Safety check
+                    if (cIdx < 0 || cIdx >= q.options.length) cIdx = 0;
                     
                     const correctText = q.options[cIdx];
                     
