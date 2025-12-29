@@ -62,7 +62,7 @@ function loadQuizFromFirebase(quizId) {
             // PRE-PROCESS: Ensure correctIndex is a Number for ALL questions immediately
             questions.forEach(q => {
                 q.correctIndex = parseInt(q.correctIndex);
-                if (isNaN(q.correctIndex)) q.correctIndex = 0; // Fallback safety
+                if (isNaN(q.correctIndex)) q.correctIndex = 0; 
             });
 
             // 2. Randomization Logic
@@ -71,10 +71,7 @@ function loadQuizFromFirebase(quizId) {
             }
             if(data.randomizeOptions) {
                 questions.forEach(q => {
-                    // correctIndex is already an integer from the loop above
                     let cIdx = q.correctIndex;
-                    
-                    // Safety check
                     if (cIdx < 0 || cIdx >= q.options.length) cIdx = 0;
                     
                     const correctText = q.options[cIdx];
@@ -269,12 +266,10 @@ function submitTest() {
     let s=0, c=0, w=0, sk=0;
     
     questions.forEach((q, i) => { 
-        // Force conversion to Number
         const correctIdx = Number(q.correctIndex);
         const userAns = userAnswers[i];
         
         if(userAns !== null) { 
-            // Use loose equality (==) for robust comparison
             if(userAns == correctIdx) { 
                 s += quizSettings.posMark; 
                 c++; 
@@ -289,7 +284,6 @@ function submitTest() {
     
     const score = s.toFixed(2);
     
-    // Save to Firebase
     const stdName = document.getElementById('stdName').value || 'Anonymous';
     if(currentQuizId) {
         database.ref('results/' + currentQuizId).push({
@@ -322,6 +316,8 @@ function submitTest() {
     }
 
     document.getElementById('resultModal').style.display = 'flex';
+    // Initialize Tab
+    switchTab('score');
     applyFilter('all');
 }
 
@@ -335,7 +331,6 @@ function applyFilter(t) {
         let st = 'skipped';
         
         if(u !== null) {
-            // Loose equality for robust checking
             st = (u == correctIdx) ? 'correct' : 'wrong';
         }
         
@@ -345,13 +340,8 @@ function applyFilter(t) {
     renderResultPalette();
     
     if(filteredIndices.length > 0) { 
-        document.getElementById('resContentArea').style.display = 'flex'; 
-        document.getElementById('resEmptyMsg').style.display = 'none'; 
         loadResultQuestion(filteredIndices[0]); 
-    } else { 
-        document.getElementById('resContentArea').style.display = 'none'; 
-        document.getElementById('resEmptyMsg').style.display = 'flex'; 
-    }
+    } 
 }
 
 function renderResultPalette() {
@@ -363,10 +353,14 @@ function renderResultPalette() {
         const correctIdx = Number(q.correctIndex);
 
         if(u === null) btn.classList.add('skipped'); 
-        else if(u == correctIdx) btn.classList.add('correct'); // Loose equality
+        else if(u == correctIdx) btn.classList.add('correct'); 
         else btn.classList.add('wrong');
         
-        btn.onclick = () => loadResultQuestion(idx);
+        btn.onclick = () => {
+            // Auto switch to solution tab when clicked from Score Tab palette
+            loadResultQuestion(idx);
+            switchTab('solution');
+        };
         c.appendChild(btn);
     });
 }
@@ -375,7 +369,6 @@ function loadResultQuestion(realIdx) {
     const nIdx = filteredIndices.indexOf(realIdx);
     if(nIdx === -1) return;
 
-    // Active Button Style Update
     document.querySelectorAll('.rp-btn').forEach(b => b.classList.remove('active'));
     if(document.querySelectorAll('.rp-btn')[nIdx]) document.querySelectorAll('.rp-btn')[nIdx].classList.add('active');
     
@@ -383,10 +376,8 @@ function loadResultQuestion(realIdx) {
     
     const u = userAnswers[realIdx];
     const q = questions[realIdx];
-    // Force Number conversion
     const c = Number(q.correctIndex); 
 
-    // Badge Update - Use loose equality (==) for robust comparison
     const b = document.getElementById('resQStatusBadge');
     if(u === null) { 
         b.innerText = "Skipped"; b.style.background = "#ffc107"; b.style.color = "#333"; 
@@ -396,28 +387,18 @@ function loadResultQuestion(realIdx) {
         b.innerText = "Wrong"; b.style.background = "#dc3545"; b.style.color = "white"; 
     }
     
-    // Question Text & Image
     let qHTML = "";
     if(q.qImg) qHTML += `<img src="${q.qImg}" style="max-height:200px; max-width:100%; display:block; margin:0 auto 10px; border-radius:4px;">`;
     qHTML += q.question;
     document.getElementById('resQuestionText').innerHTML = qHTML;
 
-    // Options Rendering
     const con = document.getElementById('resOptionsContainer'); 
     con.innerHTML = '';
 
     q.options.forEach((o, i) => {
         let cls = 'res-opt-row';
-        
-        // Correct Answer Logic (Loose equality to prevent type mismatch)
-        if(i == c) {
-            cls += ' correct-ans';
-        }
-        
-        // User Wrong Logic (Loose equality)
-        if(u == i && u != c) {
-            cls += ' user-wrong';
-        }
+        if(i == c) cls += ' correct-ans';
+        if(u == i && u != c) cls += ' user-wrong';
 
         let optContent = '';
         if(q.optImgs && q.optImgs[i]) {
@@ -432,7 +413,6 @@ function loadResultQuestion(realIdx) {
             </div>`;
     });
     
-    // Explanation
     const explBox = document.getElementById('resExplanation');
     if(q.explanation && q.explanation.trim() !== "") { 
         explBox.style.display = "block"; 
@@ -448,6 +428,22 @@ function loadResultQuestion(realIdx) {
     
     document.getElementById('resPrevBtn').onclick = () => { if(nIdx > 0) loadResultQuestion(filteredIndices[nIdx - 1]); };
     document.getElementById('resNextBtn').onclick = () => { if(nIdx < filteredIndices.length - 1) loadResultQuestion(filteredIndices[nIdx + 1]); };
+}
+
+// --- TAB SWITCH LOGIC ---
+function switchTab(tabName) {
+    document.getElementById('btn-score').classList.remove('active');
+    document.getElementById('btn-solution').classList.remove('active');
+    document.getElementById('btn-' + tabName).classList.add('active');
+
+    if(tabName === 'score') {
+        document.getElementById('tab-score-view').style.display = 'block';
+        document.getElementById('tab-solution-view').style.display = 'none';
+    } else {
+        document.getElementById('tab-score-view').style.display = 'none';
+        document.getElementById('tab-solution-view').style.display = 'flex'; // Use flex to maintain layout
+        document.getElementById('tab-solution-view').style.flexDirection = 'column';
+    }
 }
 
 document.getElementById('submitTestBtn').addEventListener('click', submitTest);
