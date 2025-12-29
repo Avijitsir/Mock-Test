@@ -105,37 +105,14 @@ body {
 }
 
 /* Button Colors */
-/* Mark for Review - Purple */
-.tb-btn.review {
-    background: #ffffff;
-    color: #673ab7;
-    border: 1px solid #673ab7;
-}
-.tb-btn.review:active {
-    background: #f3e5f5;
-}
+.tb-btn.review { background: #ffffff; color: #673ab7; border: 1px solid #673ab7; }
+.tb-btn.review:active { background: #f3e5f5; }
 
-/* Clear Response - Gray/White */
-.tb-btn.clear {
-    background: #ffffff;
-    color: #444;
-    border: 1px solid #999;
-    flex: 0.8; /* Slightly smaller */
-}
-.tb-btn.clear:active {
-    background: #f5f5f5;
-}
+.tb-btn.clear { background: #ffffff; color: #444; border: 1px solid #999; flex: 0.8; }
+.tb-btn.clear:active { background: #f5f5f5; }
 
-/* Save & Next - Green (Primary) */
-.tb-btn.save {
-    background: #00c696;
-    color: white;
-    border: 1px solid #00c696;
-    flex: 1.5; /* Larger emphasis */
-}
-.tb-btn.save:active {
-    background: #00a880;
-}
+.tb-btn.save { background: #00c696; color: white; border: 1px solid #00c696; flex: 1.5; }
+.tb-btn.save:active { background: #00a880; }
 
 .full-width { width: 100%; }
 
@@ -196,6 +173,34 @@ body {
 /* Image & Passage */
 .q-img-display { max-width: 100%; max-height: 250px; display: block; margin: 10px auto; border-radius: 4px; border: 1px solid #eee; }
 .passage-box { background: #fff8e1; border-left: 4px solid #ffc107; padding: 10px; margin-bottom: 15px; font-size: 15px; line-height: 1.5; color: #333; max-height: 150px; overflow-y: auto; }
+
+/* --- NEW TABBED STYLE --- */
+.res-tab-header {
+    display: flex;
+    background: #f0f2f5;
+    border-bottom: 1px solid #ddd;
+}
+.rt-tab {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    font-weight: bold;
+    color: #666;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    transition: 0.3s;
+}
+.rt-tab.active {
+    color: #4361ee;
+    border-bottom: 3px solid #4361ee;
+    background: white;
+}
+/* Adjust Palette for Tab View */
+#resPaletteContainer {
+    overflow-x: visible !important; 
+    gap: 10px !important;
+}
 
 /* Mobile Responsive */
 @media (max-width: 360px) {
