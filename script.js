@@ -44,25 +44,34 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize Swipe Listeners
     setupSwipe('examSwipeArea', () => {
-        // Prev Action
         if(!isPaused && currentIdx > 0) loadQuestion(currentIdx - 1);
     }, () => {
-        // Next Action
         if(!isPaused && currentIdx < questions.length - 1) loadQuestion(currentIdx + 1);
     });
 
     setupSwipe('resSwipeArea', () => {
-        // Result Prev
         const nIdx = filteredIndices.indexOf(currentResRealIdx);
         if(nIdx > 0) loadResultQuestion(filteredIndices[nIdx - 1]);
     }, () => {
-        // Result Next
         const nIdx = filteredIndices.indexOf(currentResRealIdx);
         if(nIdx < filteredIndices.length - 1) loadResultQuestion(filteredIndices[nIdx + 1]);
     });
+
+    // --- FIX: Checkbox Listener for Validation & Fullscreen ---
+    document.getElementById('agreeCheck').addEventListener('change', function() {
+        const btn = document.getElementById('startTestBtn');
+        btn.disabled = !this.checked; // চেক না করলে বাটন ডিজেবল থাকবে
+        
+        // চেক বক্সে ক্লিক করলেই ফুলস্ক্রিন হবে (Introduction Fullscreen Fix)
+        if(this.checked && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log("Fullscreen blocked: User interaction required.");
+            });
+        }
+    });
 });
 
-let currentResRealIdx = -1; // Track current result question index for swipe
+let currentResRealIdx = -1; 
 
 function setupSwipe(elementId, onSwipeRight, onSwipeLeft) {
     const el = document.getElementById(elementId);
@@ -82,10 +91,10 @@ function setupSwipe(elementId, onSwipeRight, onSwipeLeft) {
 
     function handleSwipe() {
         if (touchEndX < touchStartX - 50) {
-            onSwipeLeft(); // Swiped Left -> Go Next
+            onSwipeLeft(); 
         }
         if (touchEndX > touchStartX + 50) {
-            onSwipeRight(); // Swiped Right -> Go Prev
+            onSwipeRight(); 
         }
     }
 }
@@ -106,20 +115,19 @@ function loadQuizFromFirebase(quizId) {
 
             questions = data.questions;
 
-            // PRE-PROCESS: Ensure correctIndex is a Number
+            // PRE-PROCESS
             questions.forEach(q => {
                 q.correctIndex = parseInt(q.correctIndex);
                 if (isNaN(q.correctIndex)) q.correctIndex = 0; 
             });
 
-            // 2. Randomization Logic (With Fix for 'Option A' Issue)
+            // 2. Randomization Logic
             if(data.randomizeQuestions) {
                 shuffleArray(questions);
             }
             if(data.randomizeOptions) {
                 questions.forEach(q => {
                     let cIdx = q.correctIndex;
-                    // Safety check
                     if (cIdx < 0 || cIdx >= q.options.length) cIdx = 0;
                     
                     const correctText = q.options[cIdx];
@@ -133,9 +141,7 @@ function loadQuizFromFirebase(quizId) {
                     q.options = combinedOpts.map(o => o.text);
                     q.optImgs = combinedOpts.map(o => o.img);
                     
-                    // Re-calculate correct index based on the moved text
                     const newIndex = q.options.indexOf(correctText);
-                    // If somehow not found (rare duplicate case), fallback to 0 but ideally correctText is unique
                     q.correctIndex = newIndex !== -1 ? newIndex : 0;
                 });
             }
@@ -178,7 +184,10 @@ function loadQuizFromFirebase(quizId) {
                 </div>`;
             
             document.getElementById('instContent').innerHTML = instHTML;
-            document.getElementById('startTestBtn').disabled = false;
+            
+            // --- FIX: Button disabled logic logic fixed ---
+            // বাটন ডিজেবল থাকবে যতক্ষণ না চেকবক্সে ক্লিক করা হয়
+            document.getElementById('startTestBtn').disabled = !document.getElementById('agreeCheck').checked;
         } else {
             document.getElementById('instContent').innerHTML = "Quiz not found or invalid.";
         }
@@ -191,7 +200,7 @@ document.getElementById('startTestBtn').addEventListener('click', () => {
     localStorage.setItem('student_name', name);
 
     document.getElementById('instructionScreen').style.display = 'none';
-    document.getElementById('quizMainArea').style.display = 'flex'; // Changed to flex for swipe container
+    document.getElementById('quizMainArea').style.display = 'flex'; 
     if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
     loadQuestion(0);
     startTimer();
@@ -312,7 +321,6 @@ function submitTest() {
     if(isSubmitted) return;
     isSubmitted = true;
     clearInterval(timerInterval);
-    // REMOVED: document.exitFullscreen() to keep fullscreen in result
     
     let s=0, c=0, w=0, sk=0;
     
@@ -367,13 +375,11 @@ function submitTest() {
     }
 
     document.getElementById('resultModal').style.display = 'flex';
-    // Initialize Tab
     switchTab('score');
     applyFilter('all');
 }
 
 function applyFilter(t) {
-    // Update all filter buttons (in both tabs)
     document.querySelectorAll('.f-btn').forEach(b => { 
         b.classList.remove('active'); 
         if(b.innerText.toLowerCase() === t) b.classList.add('active'); 
@@ -394,13 +400,11 @@ function applyFilter(t) {
     
     renderResultPalette();
     
-    // Auto load first question of filter list in solution tab
     if(filteredIndices.length > 0) { 
         document.getElementById('resEmptyMsg').style.display = 'none';
         document.getElementById('tab-solution-view').querySelector('.content-area').style.display = 'block';
         loadResultQuestion(filteredIndices[0]); 
     } else {
-        // Show empty message if no questions in this filter
         document.getElementById('resEmptyMsg').style.display = 'flex';
         document.getElementById('tab-solution-view').querySelector('.content-area').style.display = 'none';
     }
@@ -430,7 +434,7 @@ function loadResultQuestion(realIdx) {
     const nIdx = filteredIndices.indexOf(realIdx);
     if(nIdx === -1) return;
     
-    currentResRealIdx = realIdx; // Update for swipe
+    currentResRealIdx = realIdx; 
 
     document.querySelectorAll('.rp-btn').forEach(b => b.classList.remove('active'));
     if(document.querySelectorAll('.rp-btn')[nIdx]) document.querySelectorAll('.rp-btn')[nIdx].classList.add('active');
@@ -493,7 +497,6 @@ function loadResultQuestion(realIdx) {
     document.getElementById('resNextBtn').onclick = () => { if(nIdx < filteredIndices.length - 1) loadResultQuestion(filteredIndices[nIdx + 1]); };
 }
 
-// --- TAB SWITCH LOGIC ---
 function switchTab(tabName) {
     document.getElementById('btn-score').classList.remove('active');
     document.getElementById('btn-solution').classList.remove('active');
