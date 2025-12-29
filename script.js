@@ -63,24 +63,34 @@ function loadQuizFromFirebase(quizId) {
             if(data.randomizeQuestions) {
                 shuffleArray(questions);
             }
+            
+            // Randomize Options Logic
             if(data.randomizeOptions) {
                 questions.forEach(q => {
-                    // Ensure correctIndex is treated as an integer initially
+                    // Ensure correctIndex is treated as an integer
                     let cIdx = parseInt(q.correctIndex);
                     const correctText = q.options[cIdx];
                     
+                    // Combine text and image for shuffling
                     let combinedOpts = q.options.map((opt, i) => {
-                        return { text: opt, img: (q.optImgs && q.optImgs[i]) ? q.optImgs[i] : null };
+                        return { 
+                            text: opt, 
+                            img: (q.optImgs && q.optImgs[i]) ? q.optImgs[i] : null 
+                        };
                     });
                     
                     shuffleArray(combinedOpts);
                     
+                    // Separate back into arrays
                     q.options = combinedOpts.map(o => o.text);
                     q.optImgs = combinedOpts.map(o => o.img);
+                    
+                    // Find new correct index
                     q.correctIndex = q.options.indexOf(correctText);
                 });
             }
 
+            // Initialize Status Arrays
             status = new Array(questions.length).fill(0); 
             userAnswers = new Array(questions.length).fill(null); 
             
@@ -93,7 +103,7 @@ function loadQuizFromFirebase(quizId) {
                 </div>`;
             }
 
-            // --- 4. INSTRUCTION PAGE ---
+            // --- 4. INSTRUCTION PAGE HTML ---
             const instHTML = `
                 ${prevScoreMsg}
                 <div style="font-family: 'Roboto', sans-serif; font-size: 15px; line-height: 1.6; color:#333;">
@@ -125,6 +135,7 @@ function loadQuizFromFirebase(quizId) {
     });
 }
 
+// Start Button Handler
 document.getElementById('startTestBtn').addEventListener('click', () => {
     const name = document.getElementById('stdName').value.trim();
     if(!name) { alert("দয়া করে আপনার নাম লিখুন।"); return; }
@@ -132,12 +143,15 @@ document.getElementById('startTestBtn').addEventListener('click', () => {
 
     document.getElementById('instructionScreen').style.display = 'none';
     document.getElementById('quizMainArea').style.display = 'block';
+    
+    // Request Fullscreen
     if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+    
     loadQuestion(0);
     startTimer();
 });
 
-// Fullscreen Logic
+// Fullscreen Warning Logic
 document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement && !isSubmitted) document.getElementById('fullscreenOverlay').style.display = 'flex';
     else document.getElementById('fullscreenOverlay').style.display = 'none';
@@ -173,11 +187,16 @@ function loadQuestion(index) {
         if(userAnswers[index] === i) row.classList.add('selected');
         
         let optContent = `<div class="radio-circle"></div><div style="flex:1;">`;
-        if(q.optImgs && q.optImgs[i]) optContent += `<img src="${q.optImgs[i]}" style="max-width:100px; display:block; margin-bottom:5px;">`;
+        // Check for option images safely
+        if(q.optImgs && q.optImgs[i]) optContent += `<img src="${q.optImgs[i]}" style="max-width:100px; display:block; margin-bottom:5px; border-radius:4px;">`;
         optContent += `<div class="opt-text">${opt}</div></div>`;
         
         row.innerHTML = optContent;
-        row.onclick = () => { if(isPaused) return; document.querySelectorAll('.option-row').forEach(r => r.classList.remove('selected')); row.classList.add('selected'); };
+        row.onclick = () => { 
+            if(isPaused) return; 
+            document.querySelectorAll('.option-row').forEach(r => r.classList.remove('selected')); 
+            row.classList.add('selected'); 
+        };
         container.appendChild(row);
     });
 
@@ -186,6 +205,7 @@ function loadQuestion(index) {
 
 function getSelIdx() { const s = document.querySelector('.option-row.selected'); return s ? Array.from(s.parentNode.children).indexOf(s) : null; }
 
+// Footer Buttons
 document.getElementById('markReviewBtn').addEventListener('click', () => { 
     if(isPaused) return; 
     const i = getSelIdx(); 
@@ -214,7 +234,7 @@ document.getElementById('clearResponseBtn').addEventListener('click', () => {
 
 function nextQ() { if(currentIdx < questions.length - 1) loadQuestion(currentIdx + 1); else openDrawer(); }
 
-// Drawer & Timer
+// Drawer & Timer Logic
 const drawer = document.getElementById('paletteSheet');
 document.querySelector('.menu-icon').addEventListener('click', () => { renderPalette(); drawer.classList.add('open'); document.getElementById('sheetOverlay').style.display='block'; });
 function closeDrawer() { drawer.classList.remove('open'); setTimeout(()=>document.getElementById('sheetOverlay').style.display='none', 300); }
@@ -249,7 +269,7 @@ document.getElementById('pauseBtn').addEventListener('click', () => {
     else { startTimer(); isPaused=false; b.innerText="Pause"; b.style.background="white"; b.style.color="#007bff"; ca.style.opacity='1'; }
 });
 
-// --- SUBMIT & RESULT ANALYSIS ---
+// --- SUBMIT & RESULT ANALYSIS (Fixed) ---
 function submitTest() {
     if(isSubmitted) return;
     isSubmitted = true;
@@ -259,7 +279,7 @@ function submitTest() {
     let s=0, c=0, w=0, sk=0;
     
     questions.forEach((q, i) => { 
-        // Force parsing correctIndex to integer for safe comparison
+        // FIX: Ensure correctIndex is treated as Integer
         const correctIdx = parseInt(q.correctIndex);
         
         if(userAnswers[i] !== null) { 
@@ -286,13 +306,13 @@ function submitTest() {
     }
     localStorage.setItem('last_score_' + currentQuizId, score);
 
+    // Update UI
     document.getElementById('resScore').innerText = score; 
     document.getElementById('resCorrect').innerText = c; 
     document.getElementById('resWrong').innerText = w; 
     document.getElementById('resSkip').innerText = sk;
     
     const passBox = document.getElementById('passFailBox');
-    
     if(s >= quizSettings.passMark) {
         passBox.innerHTML = `🎉 অভিনন্দন! আপনি পাস করেছেন।`; 
         passBox.style.background = "#d4edda"; 
@@ -310,6 +330,7 @@ function submitTest() {
     }
 
     document.getElementById('resultModal').style.display = 'flex';
+    // Show All Questions by default
     applyFilter('all');
 }
 
@@ -319,6 +340,7 @@ function applyFilter(t) {
     filteredIndices = [];
     questions.forEach((q, i) => {
         const u = userAnswers[i];
+        // FIX: Ensure Integer comparison
         const correctIdx = parseInt(q.correctIndex);
         let st = 'skipped';
         
@@ -347,6 +369,7 @@ function renderResultPalette() {
         const btn = document.createElement('div'); btn.className = 'rp-btn'; btn.innerText = idx + 1;
         const u = userAnswers[idx];
         const q = questions[idx];
+        // FIX: Ensure Integer comparison
         const correctIdx = parseInt(q.correctIndex);
 
         if(u === null) btn.classList.add('skipped'); 
@@ -358,11 +381,12 @@ function renderResultPalette() {
     });
 }
 
+// --- FIXED: Load Result Question (Images & Logic) ---
 function loadResultQuestion(realIdx) {
     const nIdx = filteredIndices.indexOf(realIdx);
     if(nIdx === -1) return;
 
-    // Active Button Style Update
+    // Highlight Active Button
     document.querySelectorAll('.rp-btn').forEach(b => b.classList.remove('active'));
     if(document.querySelectorAll('.rp-btn')[nIdx]) document.querySelectorAll('.rp-btn')[nIdx].classList.add('active');
     
@@ -370,9 +394,10 @@ function loadResultQuestion(realIdx) {
     
     const u = userAnswers[realIdx];
     const q = questions[realIdx];
-    const c = parseInt(q.correctIndex); // Parse to Integer
+    // IMPORTANT FIX: Parse correctIndex to Int for safe comparison
+    const c = parseInt(q.correctIndex);
 
-    // Badge Update
+    // Status Badge
     const b = document.getElementById('resQStatusBadge');
     if(u === null) { 
         b.innerText = "Skipped"; b.style.background = "#ffc107"; b.style.color = "#333"; 
@@ -388,16 +413,25 @@ function loadResultQuestion(realIdx) {
     qHTML += q.question;
     document.getElementById('resQuestionText').innerHTML = qHTML;
 
-    // Options Rendering
+    // Options Rendering with Fixes
     const con = document.getElementById('resOptionsContainer'); 
     con.innerHTML = '';
 
     q.options.forEach((o, i) => {
         let cls = 'res-opt-row';
-        if(i === c) cls += ' correct-ans';
-        if(u === i && u !== c) cls += ' user-wrong';
+        
+        // Correct Answer Logic (Always Green)
+        if(i === c) {
+            cls += ' correct-ans';
+        }
+        
+        // User Wrong Choice Logic (Red)
+        if(u === i && u !== c) {
+            cls += ' user-wrong';
+        }
 
         let optContent = '';
+        // FIX: Check if image exists before adding
         if(q.optImgs && q.optImgs[i]) {
             optContent += `<img src="${q.optImgs[i]}" style="height:50px; display:block; margin-bottom:5px; border:1px solid #ddd; border-radius:3px;">`;
         }
@@ -410,7 +444,7 @@ function loadResultQuestion(realIdx) {
             </div>`;
     });
     
-    // Explanation
+    // Explanation Section with Image Support
     const explBox = document.getElementById('resExplanation');
     if(q.explanation && q.explanation.trim() !== "") { 
         explBox.style.display = "block"; 
@@ -422,8 +456,10 @@ function loadResultQuestion(realIdx) {
         explBox.style.display = "none"; 
     }
 
+    // Retrigger MathJax for equations
     if(window.MathJax) MathJax.typesetPromise();
     
+    // Navigation Handlers
     document.getElementById('resPrevBtn').onclick = () => { if(nIdx > 0) loadResultQuestion(filteredIndices[nIdx - 1]); };
     document.getElementById('resNextBtn').onclick = () => { if(nIdx < filteredIndices.length - 1) loadResultQuestion(filteredIndices[nIdx + 1]); };
 }
